@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Estudos - PCPR</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body class="p-6">
+
+    <header class="mb-8 flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800"><i class="fas fa-shield-alt text-blue-600"></i> Painel PCPR</h1>
+            <p class="text-gray-600">Gestão de Estudos para Polícia Civil do Paraná</p>
+        </div>
+        <button onclick="limparTudo()" class="text-red-500 text-sm hover:underline">Resetar Dados</button>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <div class="card p-6 col-span-1">
+            <h2 class="text-xl font-bold mb-4 text-gray-700">📚 Cadastrar Conteúdo</h2>
+            <form id="formCadastro" onsubmit="adicionarMateria(event)">
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700">Matéria</label>
+                    <input type="text" id="materia" placeholder="Ex: Direito Penal" class="w-full p-2 border rounded mt-1" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700">Assunto</label>
+                    <input type="text" id="assunto" placeholder="Ex: Crimes Contra a Vida" class="w-full p-2 border rounded mt-1" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700">Relevância na Prova (%)</label>
+                    <input type="range" id="relevancia" min="1" max="100" value="50" class="w-full mt-1" oninput="document.getElementById('valRel').innerText = this.value + '%'">
+                    <span id="valRel" class="text-sm text-blue-600 font-bold">50%</span>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition">Adicionar</button>
+            </form>
+        </div>
+
+        <div class="card p-6 col-span-1 text-center bg-gray-800 text-white">
+            <h2 class="text-xl font-bold mb-4">⏱️ Temporizador de Foco</h2>
+            
+            <select id="selectMateriaEstudo" class="w-full p-2 mb-4 text-gray-800 rounded">
+                <option value="">Selecione o que vai estudar...</option>
+            </select>
+
+            <div class="text-5xl font-mono mb-6" id="displayTempo">00:00:00</div>
+            
+            <div class="flex justify-center gap-4">
+                <button onclick="iniciarTimer()" id="btnStart" class="bg-green-500 p-3 rounded-full w-12 h-12 flex items-center justify-center hover:bg-green-600"><i class="fas fa-play"></i></button>
+                <button onclick="pausarTimer()" class="bg-yellow-500 p-3 rounded-full w-12 h-12 flex items-center justify-center hover:bg-yellow-600"><i class="fas fa-pause"></i></button>
+                <button onclick="pararESalvar()" class="bg-red-500 p-3 rounded-full w-12 h-12 flex items-center justify-center hover:bg-red-600"><i class="fas fa-save"></i></button>
+            </div>
+            <p class="mt-4 text-xs text-gray-400">Clique no Save (vermelho) para registrar o tempo.</p>
+        </div>
+
+        <div class="card p-6 col-span-1">
+            <h2 class="text-xl font-bold mb-4 text-gray-700">📊 Estatísticas</h2>
+            <div class="space-y-4">
+                <div>
+                    <p class="text-sm text-gray-500">Total de Horas Estudadas</p>
+                    <p class="text-2xl font-bold text-blue-600" id="totalHoras">0h 00m</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Assuntos Cadastrados</p>
+                    <p class="text-2xl font-bold text-gray-800" id="totalAssuntos">0</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-8">
+        <h2 class="text-xl font-bold mb-4 text-gray-800">📋 Plano de Estudos</h2>
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="min-w-full leading-normal">
+                <thead>
+                    <tr>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Matéria</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Assunto</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Relevância</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Tempo Estudado</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Ação</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaCorpo">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // --- Lógica do Sistema ---
+
+        let dados = JSON.parse(localStorage.getItem('dadosPCPR')) || [];
+        let timerInterval;
+        let segundos = 0;
+        let isRunning = false;
+
+        function salvarDados() {
+            localStorage.setItem('dadosPCPR', JSON.stringify(dados));
+            renderizar();
+        }
+
+        function adicionarMateria(e) {
+            e.preventDefault();
+            const materia = document.getElementById('materia').value;
+            const assunto = document.getElementById('assunto').value;
+            const relevancia = document.getElementById('relevancia').value;
+
+            const novoItem = {
+                id: Date.now(),
+                materia,
+                assunto,
+                relevancia: parseInt(relevancia),
+                tempo: 0 // em segundos
+            };
+
+            dados.push(novoItem);
+            salvarDados();
+            document.getElementById('formCadastro').reset();
+            document.getElementById('valRel').innerText = '50%';
+        }
+
+        function deletarItem(id) {
+            if(confirm('Tem certeza que deseja excluir?')) {
+                dados = dados.filter(item => item.id !== id);
+                salvarDados();
+            }
+        }
+
+        function formatarTempo(segundos) {
+            const h = Math.floor(segundos / 3600);
+            const m = Math.floor((segundos % 3600) / 60);
+            const s = segundos % 60;
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function renderizar() {
+            const tbody = document.getElementById('tabelaCorpo');
+            const select = document.getElementById('selectMateriaEstudo');
+            tbody.innerHTML = '';
+            
+            // Atualizar Select do Timer (Apenas limpar se não estiver rodando para não atrapalhar UX)
+            if (!isRunning) {
+                select.innerHTML = '<option value="">Selecione o que vai estudar...</option>';
+            }
+
+            let totalSegundosGeral = 0;
+
+            dados.forEach(item => {
+                totalSegundosGeral += item.tempo;
+
+                // Preencher Tabela
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm"><span class="font-bold text-gray-700">${item.materia}</span></td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">${item.assunto}</td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${item.relevancia}%"></div>
+                        </div>
+                        <span class="text-xs text-gray-500">${item.relevancia}% chance</span>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm font-mono">${formatarTempo(item.tempo)}</td>
+                    <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                        <button onclick="deletarItem(${item.id})" class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+
+                // Preencher Select (se não estiver rodando o timer)
+                if (!isRunning) {
+                    const option = document.createElement('option');
+                    option.value = item.id;
+                    option.text = `${item.materia} - ${item.assunto}`;
+                    select.appendChild(option);
+                }
+            });
+
+            // Atualizar Dashboard
+            document.getElementById('totalAssuntos').innerText = dados.length;
+            const horasGeral = Math.floor(totalSegundosGeral / 3600);
+            const minGeral = Math.floor((totalSegundosGeral % 3600) / 60);
+            document.getElementById('totalHoras').innerText = `${horasGeral}h ${minGeral}m`;
+        }
+
+        // --- Lógica do Timer ---
+
+        function iniciarTimer() {
+            const select = document.getElementById('selectMateriaEstudo');
+            if(!select.value) {
+                alert("Selecione uma matéria/assunto para estudar primeiro!");
+                return;
+            }
+            
+            if(isRunning) return;
+            
+            isRunning = true;
+            document.getElementById('selectMateriaEstudo').disabled = true;
+            document.getElementById('btnStart').classList.add('opacity-50');
+
+            timerInterval = setInterval(() => {
+                segundos++;
+                document.getElementById('displayTempo').innerText = formatarTempo(segundos);
+            }, 1000);
+        }
+
+        function pausarTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            document.getElementById('btnStart').classList.remove('opacity-50');
+        }
+
+        function pararESalvar() {
+            if(!document.getElementById('selectMateriaEstudo').value) return;
+
+            pausarTimer();
+            const idSelecionado = parseInt(document.getElementById('selectMateriaEstudo').value);
+            
+            // Buscar o item e somar o tempo
+            const index = dados.findIndex(i => i.id === idSelecionado);
+            if(index !== -1) {
+                dados[index].tempo += segundos;
+                salvarDados();
+                alert(`Parabéns! Você registrou ${formatarTempo(segundos)} de estudos em ${dados[index].materia}.`);
+            }
+
+            // Resetar Timer
+            segundos = 0;
+            document.getElementById('displayTempo').innerText = "00:00:00";
+            document.getElementById('selectMateriaEstudo').disabled = false;
+            document.getElementById('selectMateriaEstudo').value = "";
+        }
+
+        function limparTudo() {
+            if(confirm("Isso apagará TODO o seu histórico de estudos. Tem certeza?")) {
+                localStorage.removeItem('dadosPCPR');
+                location.reload();
+            }
+        }
+
+        // Inicializar
+        renderizar();
+
+    </script>
+</body>
+</html>
