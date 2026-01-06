@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Estudos - PCPR</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s; }
+        .card:hover { transform: translateY(-2px); }
+        /* Animação do Modal */
+        .modal-animate { animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        /* Scroll customizado para o modal */
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 3px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+        /* Remove setas do input number */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="p-6 min-h-screen flex flex-col">
+
+    <header class="mb-8 flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-lg shadow-sm gap-4">
+        <div class="flex items-center gap-3 w-full md:w-auto">
+            <div class="bg-blue-600 text-white p-3 rounded-full">
+                <i class="fas fa-shield-alt text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">Painel PCPR</h1>
+                <p class="text-gray-500 text-sm">Gestão de Estudos e Revisão Ativa</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Card de Alertas de Revisão (Só aparece se houver revisão) -->
+    <div id="cardAlertasRevisao" class="hidden mb-8 bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-md shadow-md animate-pulse">
+        <div class="flex items-start">
+            <div class="flex-shrink-0">
+                <i class="fas fa-exclamation-triangle text-yellow-500 text-xl mt-1"></i>
+            </div>
+            <div class="ml-3 w-full">
+                <h3 class="text-lg leading-6 font-medium text-yellow-800">Ciclo de Revisão Ativa Detectado</h3>
+                <p class="text-sm text-yellow-700 mt-1">
+                    Com base no seu cronograma de hoje, você precisa revisar estes assuntos antes de avançar:
+                </p>
+                <div id="listaRevisoesPendentes" class="mt-4 space-y-3">
+                    <!-- Injetado via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        
+        <!-- Cartão do Timer -->
+        <div class="card p-6 col-span-1 text-center bg-gray-900 text-white border-t-4 border-green-500 relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-4 opacity-10">
+                <i class="fas fa-stopwatch text-9xl"></i>
+            </div>
+            <h2 class="text-xl font-bold mb-4 relative z-10">⏱️ Temporizador de Foco</h2>
+            
+            <select id="selectMateriaEstudo" class="w-full p-2 mb-6 text-gray-800 rounded border-none focus:ring-2 focus:ring-green-400 relative z-10 cursor-pointer">
+                <option value="">Selecione o que vai estudar...</option>
+            </select>
+
+            <div class="text-6xl font-mono mb-8 font-bold tracking-wider relative z-10" id="displayTempo">00:00:00</div>
+            
+            <div class="flex justify-center gap-4 relative z-10">
+                <button onclick="iniciarTimer()" id="btnStart" class="bg-green-500 p-4 rounded-full w-14 h-14 flex items-center justify-center hover:bg-green-600 text-white shadow-lg transition transform hover:scale-110 active:scale-95" title="Iniciar">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button onclick="pausarTimer()" class="bg-yellow-500 p-4 rounded-full w-14 h-14 flex items-center justify-center hover:bg-yellow-600 text-white shadow-lg transition transform hover:scale-110 active:scale-95" title="Pausar">
+                    <i class="fas fa-pause"></i>
+                </button>
+                <button onclick="pararESalvar()" class="bg-red-500 p-4 rounded-full w-14 h-14 flex items-center justify-center hover:bg-red-600 text-white shadow-lg transition transform hover:scale-110 active:scale-95" title="Salvar e Parar">
+                    <i class="fas fa-save"></i>
+                </button>
+            </div>
+            <p class="mt-6 text-xs text-gray-400 relative z-10">O tempo salvo gera automaticamente suas revisões futuras.</p>
+        </div>
+
+        <!-- Cartão de Estatísticas -->
+        <div class="card p-6 col-span-1 border-t-4 border-purple-500 flex flex-col justify-center">
+            <h2 class="text-xl font-bold mb-4 text-gray-700"><i class="fas fa-chart-pie text-purple-500 mr-2"></i>Estatísticas</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Tempo Total -->
+                <div class="flex items-center p-3 bg-blue-50 rounded-lg sm:col-span-2">
+                    <div class="p-3 bg-blue-200 rounded-full text-blue-600 mr-4">
+                        <i class="fas fa-clock text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium uppercase">Tempo Total</p>
+                        <p class="text-xl font-bold text-gray-800" id="totalHoras">0h 00m</p>
+                    </div>
+                </div>
+                
+                <!-- Assuntos Cadastrados (CORRIGIDO: Elemento reintroduzido) -->
+                <div class="flex items-center p-3 bg-green-50 rounded-lg">
+                    <div class="p-3 bg-green-200 rounded-full text-green-600 mr-3">
+                        <i class="fas fa-list-ol text-lg"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium uppercase">Assuntos</p>
+                        <p class="text-xl font-bold text-gray-800" id="totalAssuntos">0</p>
+                    </div>
+                </div>
+
+                <!-- Revisões Pendentes -->
+                <div class="flex items-center p-3 bg-red-50 rounded-lg">
+                    <div class="p-3 bg-red-200 rounded-full text-red-600 mr-3">
+                        <i class="fas fa-bell text-lg"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium uppercase">Revisões</p>
+                        <p class="text-xl font-bold text-red-600" id="totalRevisoesPendentes">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Novo Card: Cronograma Semanal -->
+    <div class="card p-6 mb-8 border-t-4 border-orange-500">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-gray-700"><i class="fas fa-calendar-alt text-orange-500 mr-2"></i> Cronograma Semanal</h2>
+            <div class="text-sm text-gray-500">Hoje é: <span id="diaDaSemanaDisplay" class="font-bold text-blue-600">...</span></div>
+            <button onclick="resetarCronograma()" class="text-xs text-gray-400 hover:text-orange-500 transition" title="Restaurar padrão"><i class="fas fa-undo"></i> Resetar</button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-7 gap-4" id="gridCronograma">
+            <!-- Gerado via JS -->
+        </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="flex-grow">
+        <h2 class="text-xl font-bold mb-4 text-gray-800 pl-2 border-l-4 border-gray-800">📋 Conteúdo Programático</h2>
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full leading-normal">
+                    <thead>
+                        <tr>
+                            <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Assunto</th>
+                            <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-48">Relevância (Editável)</th>
+                            <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Tempo Estudado</th>
+                            <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaCorpo">
+                        <!-- Linhas geradas via JS -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="emptyState" class="hidden p-8 text-center text-gray-500">
+                <i class="fas fa-clipboard-list text-4xl mb-3 text-gray-300"></i>
+                <p>Nenhum assunto cadastrado ainda.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Customizado -->
+    <div id="customModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden flex items-center justify-center z-50 modal-animate backdrop-blur-sm">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b flex items-center gap-2" id="modalHeader">
+                <h3 class="text-lg font-bold text-gray-800" id="modalTitle">Título</h3>
+            </div>
+            <div class="p-6 overflow-y-auto custom-scroll flex-grow">
+                <p class="text-gray-600 text-base mb-2" id="modalMessage">Mensagem aqui.</p>
+                
+                <!-- Input para Links (Escondido por padrão) -->
+                <div id="modalInputContainer" class="hidden mb-4">
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Cole o link das questões aqui:</label>
+                    <input type="text" id="modalInputLink" class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://...">
+                </div>
+
+                <!-- Container para Conteúdo de Jurisprudência -->
+                <div id="modalJurisContent" class="hidden space-y-4"></div>
+            </div>
+            <div class="p-4 bg-gray-50 flex justify-end gap-3 border-t" id="modalButtons">
+                <!-- Botões injetados via JS -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- BASE DE DADOS DE JURISPRUDÊNCIA ---
+        const BANCO_JURISPRUDENCIA = {
+            "CONSTITUCIONAL": [
+                { t: "Inviolabilidade de Domicílio (Tema 280)", p: "STF", r: "Entrada forçada exige fundadas razões, devidamente justificadas a posteriori." },
+                { t: "Intimidade vs Interesse Público (Tema 786)", p: "STF", r: "Divulgação de fatos de interesse público não gera dano moral automático." },
+                { t: "Direito de Reunião", p: "STF", r: "Independe de autorização, mas exige prévio aviso à autoridade competente." },
+                { t: "Liberdade de Expressão", p: "STF", r: "Não é absoluta; não protege discurso de ódio nem apologia ao crime." },
+                { t: "Segurança Pública - Polícia Civil", p: "STF", r: "Exerce função de polícia judiciária, não podendo ser esvaziada por outros órgãos." },
+                { t: "Guardas Municipais", p: "STF", r: "Não têm atribuição investigativa ampla, apenas proteção de bens e serviços." },
+                { t: "Direitos Políticos", p: "STF", r: "Condenação criminal transitada em julgado gera suspensão automática (art. 15, III, CF)." }
+            ],
+            "ADMINISTRATIVO": [
+                { t: "Princípio da Legalidade", p: "STF/STJ", r: "Princípio da legalidade estrita para a Administração Pública." },
+                { t: "Improbidade Administrativa", p: "STF", r: "Violação aos princípios do art. 37 pode configurar improbidade (contexto pré-reforma)." },
+                { t: "Acumulação de Cargos", p: "STF", r: "Devolução de valores por acumulação ilícita somente se comprovada má-fé." },
+                { t: "Estágio Probatório", p: "STF", r: "Exoneração não dispensa contraditório e ampla defesa." },
+                { t: "Poder de Polícia", p: "STJ", r: "Indelegável a pessoas jurídicas de direito privado, salvo atos materiais/fiscalizatórios." },
+                { t: "Multas Administrativas", p: "STF", r: "Não podem ter caráter confiscatório." },
+                { t: "Resp. Civil do Estado (Tema 940)", p: "STF", r: "Objetiva do Estado; Direito de regresso contra agente exige dolo ou culpa." },
+                { t: "Resp. Civil por Omissão", p: "STF", r: "Subjetiva (necessidade de prova de culpa/falta do serviço)." }
+            ],
+            "PENAL": [
+                { t: "Teoria do Crime", p: "STF/STJ", r: "Crime exige tipicidade + ilicitude + culpabilidade." },
+                { t: "Princípio da Insignificância", p: "STF", r: "Requisitos: mínima ofensividade, nenhuma periculosidade, reduzida reprovabilidade, inexpressividade da lesão." },
+                { t: "Erro de Tipo", p: "STJ", r: "Exclui dolo, podendo gerar culpa se prevista." },
+                { t: "Erro de Proibição", p: "STF", r: "Inevitável exclui culpabilidade; evitável reduz a pena." },
+                { t: "Concurso de Pessoas", p: "STJ", r: "Participação de menor importância gera redução obrigatória de pena." },
+                { t: "Domínio do Fato", p: "STF", r: "Teoria aplicada com cautela, não é automática para cargos de chefia." },
+                { t: "Corrupção Passiva", p: "STF", r: "Crime formal: independe do efetivo recebimento da vantagem." },
+                { t: "Peculato", p: "STJ", r: "Admite forma culposa." }
+            ],
+            "PROCESSUAL": [
+                { t: "Inquérito Policial", p: "STF", r: "Procedimento administrativo, inquisitivo e dispensável. Sem contraditório pleno." },
+                { t: "Prova Ilícita", p: "STF", r: "Inadmissível, salvo teoria da fonte independente." },
+                { t: "Cadeia de Custódia", p: "STF", r: "Requisito de validade da prova (tema muito cobrado)." },
+                { t: "Prisão em Flagrante", p: "STF", r: "Não exige mandado judicial." },
+                { t: "Flagrante Preparado", p: "STJ", r: "Configura crime impossível (Súmula 145)." },
+                { t: "Prisão Preventiva", p: "STF/STJ", r: "Exige fundamentação concreta. Gravidade abstrata do crime não basta." },
+                { t: "Audiência de Custódia", p: "STF", r: "Obrigatória." },
+                { t: "Prisão Temporária", p: "STF", r: "Somente para crimes expressamente previstos em lei." },
+                { t: "Prazo Temporária", p: "STJ", r: "Taxativo, não pode ser prorrogado fora das hipóteses legais." }
+            ],
+            "LEGISLACAO": [
+                { t: "Lei de Drogas - Usuário", p: "STF", r: "Usuário não comete crime hediondo." },
+                { t: "Tráfico Privilegiado (Tema 712)", p: "STF", r: "Não é considerado hediondo." },
+                { t: "Crimes Hediondos - Regime", p: "STF", r: "Regime inicial não é automaticamente fechado. Progressão observa individualização." },
+                { t: "Abuso de Autoridade", p: "STF", r: "Exige dolo específico (finalidade de prejudicar, beneficiar ou agir por capricho)." },
+                { t: "Hermenêutica no Abuso", p: "STJ", r: "Erro de interpretação razoável da lei não configura crime." },
+                { t: "Estatuto do Desarmamento", p: "STF", r: "Porte ilegal é crime de perigo abstrato." },
+                { t: "Numeração Raspada", p: "STJ", r: "Crime autônomo (equiparado)." },
+                { t: "Interceptação Telefônica", p: "STF", r: "Necessária decisão fundamentada. Prazo inicial 15 dias, prorrogável." },
+                { t: "Prova Emprestada", p: "STJ", r: "Válida, se respeitado o contraditório." },
+                { t: "Pacote Anticrime", p: "STF", r: "Juiz das garantias válido (suspenso). ANPP retroage se mais benéfico." }
+            ],
+            "ESTATUTO": [
+                { t: "Regime Estatutário", p: "STF", r: "Não afasta aplicação dos princípios constitucionais." },
+                { t: "Processo Administrativo (PAD)", p: "STJ", r: "Exige contraditório e ampla defesa." },
+                { t: "Independência das Instâncias", p: "STF", r: "Sanções administrativas não afastam responsabilidade penal." }
+            ]
+        };
+
+        // --- BANCO DE LINKS PADRÃO (Mesclado com user data) ---
+        const LINKS_PADRAO = {
+            "Inquérito policial; notitia criminis": "https://questoes.grancursosonline.com.br/aluno/filtro/concursos?tiposProva=1&carreira=29&assunto=406608%2C414132%2C414133%2C414134%2C414135%2C414136%2C406609%2C406610%2C406611%2C421025%2C421026%2C421027%2C421028%2C421029%2C421030%2C421031%2C421032%2C421035%2C421036%2C421037%2C421038%2C421039%2C421040%2C421041%2C421042%2C421043%2C421044%2C421045%2C421046%2C421047%2C421048%2C421049%2C421050%2C421052%2C421053%2C421054%2C421150&desatualizada=0&anulada=0"
+        };
+
+        // --- Dados Iniciais (Editais) ---
+        const EDITAL_PORTUGUES = [
+            { assunto: "Apreensão do significado global dos textos", relevancia: 75 },
+            { assunto: "Estabelecimento de relações intratextuais e intertextuais", relevancia: 75 },
+            { assunto: "Identificação de ideias principais/secundárias e relações", relevancia: 75 },
+            { assunto: "Organização argumentativa: tese e argumentos", relevancia: 75 },
+            { assunto: "Dedução de ideias implícitas e inferência de sentidos", relevancia: 75 },
+            { assunto: "Reconhecimento de diferentes 'vozes' no texto", relevancia: 75 },
+            { assunto: "Posição do autor (fato/opinião)", relevancia: 75 },
+            { assunto: "Significado de palavras em contextos", relevancia: 75 },
+            { assunto: "Recursos coesivos (expressões, pronomes)", relevancia: 75 },
+            { assunto: "Relações estruturais e semânticas entre frases", relevancia: 75 },
+            { assunto: "Compreensão de textos complexos", relevancia: 75 },
+            { assunto: "Ambiguidade, paráfrase, sinonímia e antonímia", relevancia: 75 },
+            { assunto: "Reconhecimento da função de recursos gramaticais", relevancia: 11 },
+            { assunto: "Domínio da norma padrão (gramática, ortografia)", relevancia: 11 },
+            { assunto: "Variedades linguísticas", relevancia: 0 },
+            { assunto: "Recursos verbais e não verbais (charges, gráficos)", relevancia: 0 }
+        ];
+
+        const EDITAL_INFORMATICA = [
+            { assunto: "Sistema Operacional Linux (Ubuntu 14+)", relevancia: 35 },
+            { assunto: "Operação com arquivos, Internet e Redes no Linux", relevancia: 35 },
+            { assunto: "Planilhas Eletrônicas (LibreOffice Calc)", relevancia: 24 },
+            { assunto: "Editor de Texto (LibreOffice Writer)", relevancia: 21 },
+            { assunto: "Funcionamento de periféricos (impressoras/digitalizadoras)", relevancia: 0 },
+            { assunto: "Conceitos de Internet, Intranet e gestão de info", relevancia: 0 }
+        ];
+
+        const EDITAL_EXECUTIVO = [
+            { assunto: "Const. PR: Adm. Pública (Título II) e Poder Executivo (Título III)", relevancia: 0 },
+            { assunto: "Lei Estadual nº 8.485/1987: Artigos 1º ao 43", relevancia: 0 }
+        ];
+
+        const EDITAL_PROC_PENAL = [
+            { assunto: "Prisão em flagrante", relevancia: 24 },
+            { assunto: "Prisão preventiva", relevancia: 24 },
+            { assunto: "Prisão temporária (Lei n.° 7.960/1989)", relevancia: 24 },
+            { assunto: "Inquérito policial; notitia criminis", relevancia: 18 },
+            { assunto: "Ação penal: espécies", relevancia: 0 },
+            { assunto: "Jurisdição e competência", relevancia: 0 },
+            { assunto: "Prova (artigos 158 a 184 do CPP)", relevancia: 0 }
+        ];
+
+        const EDITAL_PENAL = [
+            { assunto: "Infração penal: elementos, espécies", relevancia: 49 },
+            { assunto: "Sujeito ativo e sujeito passivo da infração penal", relevancia: 49 },
+            { assunto: "Tipicidade, ilicitude, culpabilidade, punibilidade", relevancia: 49 },
+            { assunto: "Erro de tipo e erro de proibição", relevancia: 49 },
+            { assunto: "Imputabilidade penal", relevancia: 49 },
+            { assunto: "Concurso de pessoas", relevancia: 49 },
+            { assunto: "Crimes contra a administração pública", relevancia: 24 },
+            { assunto: "Crimes contra o patrimônio", relevancia: 18 },
+            { assunto: "Crimes contra a pessoa", relevancia: 0 }
+        ];
+
+        const EDITAL_ADMINISTRATIVO = [
+            { assunto: "Poderes administrativos: hierárquico, disciplinar, regulamentar, polícia", relevancia: 28 },
+            { assunto: "Controle e responsabilização da administração", relevancia: 21 },
+            { assunto: "Organização administrativa da União: administração direta e indireta", relevancia: 16 },
+            { assunto: "Estado, governo e administração pública: conceitos, elementos, poderes", relevancia: 15 },
+            { assunto: "Agentes públicos: espécies, classificação, poderes, deveres, regime jurídico", relevancia: 0 },
+            { assunto: "Serviços públicos: conceito, classificação, regulamentação", relevancia: 0 }
+        ];
+
+        const EDITAL_CONSTITUCIONAL = [
+            { assunto: "Direitos e deveres fundamentais (individuais, coletivos, sociais)", relevancia: 47 },
+            { assunto: "Defesa do Estado e das instituições democráticas (Segurança Pública)", relevancia: 18 },
+            { assunto: "Declaração Universal dos Direitos Humanos (ONU – 1948)", relevancia: 18 },
+            { assunto: "Poder Legislativo: fundamento e atribuições", relevancia: 0 },
+            { assunto: "Poder Executivo: forma de governo, atribuições do Presidente", relevancia: 0 },
+            { assunto: "Ordem social: seguridade, educação, cultura, meio ambiente", relevancia: 0 }
+        ];
+
+        const EDITAL_RLM = [
+            { assunto: "Resolução de problemas: números reais, conjuntos, contagem, porcentagem", relevancia: 33 },
+            { assunto: "Problemas de raciocínio lógico: proposições, conectivos, equivalência", relevancia: 26 },
+            { assunto: "Compreensão de estruturas lógicas", relevancia: 26 },
+            { assunto: "Sistemas, equações e regra de três", relevancia: 17 },
+            { assunto: "Semelhança e relações métricas no triângulo retângulo", relevancia: 0 },
+            { assunto: "Área, volume e capacidade", relevancia: 0 },
+            { assunto: "Medidas de tendência central, tabelas e gráficos", relevancia: 0 },
+            { assunto: "Lógica de argumentação: analogias, inferências, deduções", relevancia: 0 },
+            { assunto: "Diagramas lógicos", relevancia: 0 },
+            { assunto: "Princípios de contagem e probabilidade", relevancia: 0 }
+        ];
+
+        const EDITAL_LEGISLACAO_ESPECIAL = [
+            { assunto: "Tráfico ilícito e uso indevido de drogas (Lei nº 11.343/2006)", relevancia: 23 },
+            { assunto: "Estatuto do desarmamento (Lei nº 10.826/2003)", relevancia: 21 },
+            { assunto: "Abuso de Autoridade (Lei nº 13.869/2019)", relevancia: 7 },
+            { assunto: "Crimes de tortura (Lei nº 9.455/1997)", relevancia: 7 },
+            { assunto: "Crimes hediondos (Lei nº 8.072/1990)", relevancia: 0 },
+            { assunto: "Crimes resultantes de preconceitos de raça ou de cor (Lei nº 7.716/1989)", relevancia: 0 },
+            { assunto: "Estatuto da Criança e do Adolescente (Lei nº 8.069/1990)", relevancia: 0 },
+            { assunto: "Crimes previstos no Código de proteção e defesa do consumidor (Lei nº 8.078/1990)", relevancia: 0 },
+            { assunto: "Crimes contra o meio ambiente (Lei nº 9.605/1998)", relevancia: 0 },
+            { assunto: "Juizados especiais (Lei nº 9.099/1995 e Lei nº 10.259/2001)", relevancia: 0 },
+            { assunto: "Crimes previstos no Código de Trânsito Brasileiro (Lei nº 9.503/1997)", relevancia: 0 },
+            { assunto: "Interceptação telefônica (Lei nº 9.296/1996)", relevancia: 0 },
+            { assunto: "Lei nº 12.830/2013 (Investigação Criminal)", relevancia: 0 },
+            { assunto: "Pacote Anti-Crime (Lei nº 13.964/2019)", relevancia: 0 }
+        ];
+
+        const TODOS_EDITAIS = [
+            ...EDITAL_PORTUGUES.map(i => ({...i, materia: 'Língua Portuguesa'})),
+            ...EDITAL_INFORMATICA.map(i => ({...i, materia: 'Informática'})),
+            ...EDITAL_EXECUTIVO.map(i => ({...i, materia: 'Estrutura do Executivo PR'})),
+            ...EDITAL_PROC_PENAL.map(i => ({...i, materia: 'Direito Processual Penal'})),
+            ...EDITAL_PENAL.map(i => ({...i, materia: 'Direito Penal'})),
+            ...EDITAL_ADMINISTRATIVO.map(i => ({...i, materia: 'Direito Administrativo'})),
+            ...EDITAL_CONSTITUCIONAL.map(i => ({...i, materia: 'Direito Constitucional'})),
+            ...EDITAL_RLM.map(i => ({...i, materia: 'Raciocínio Lógico'})),
+            ...EDITAL_LEGISLACAO_ESPECIAL.map(i => ({...i, materia: 'Legislação Penal Especial'}))
+        ];
+
+        // --- Lógica do Sistema ---
+
+        let dados = JSON.parse(localStorage.getItem('dadosPCPR')) || [];
+        // Histórico de Estudos: Array de objetos { idMateria, data, tempo, revisado: false }
+        let historicoEstudos = JSON.parse(localStorage.getItem('historicoEstudosPCPR')) || [];
+        
+        const defaultCronograma = {
+            'Segunda': 'Direito Constitucional\nDireito Administrativo',
+            'Terça': 'Direito Penal\nProcesso Penal',
+            'Quarta': 'Legislação Especial\nInformática',
+            'Quinta': 'Direito Constitucional\nDireito Penal',
+            'Sexta': 'Direito Administrativo\nProcesso Penal',
+            'Sábado': 'Revisão (Ciclo de Estudos)',
+            'Domingo': ''
+        };
+        let cronograma = JSON.parse(localStorage.getItem('cronogramaPCPR')) || defaultCronograma;
+
+        let timerInterval;
+        let segundos = 0;
+        let isRunning = false;
+
+        // Auto-importação se vazio
+        if (dados.length === 0) {
+            dados = TODOS_EDITAIS.map((item, index) => {
+                let link = LINKS_PADRAO[item.assunto] || "";
+                return { ...item, id: Date.now() + index, tempo: 0, linkQuestao: link };
+            });
+            localStorage.setItem('dadosPCPR', JSON.stringify(dados));
+        }
+
+        // --- Opções de Matérias para o Cronograma ---
+        const MATERIAS_DISPONIVEIS = [
+            "Língua Portuguesa",
+            "Informática",
+            "Raciocínio Lógico",
+            "Direito Processual Penal",
+            "Direito Penal",
+            "Legislação Penal Especial",
+            "Direito Administrativo",
+            "Direito Constitucional",
+            "Estrutura do Executivo PR",
+            "Revisão (Ciclo de Estudos)",
+            "Redação",
+            "Simulado"
+        ];
+
+        // --- Lógica de Revisão Ativa ---
+        
+        function verificarRevisoesDoDia() {
+            const diasDaSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+            const hoje = new Date();
+            const diaHojeStr = diasDaSemana[hoje.getDay()];
+            
+            // Atualizar display do dia
+            document.getElementById('diaDaSemanaDisplay').innerText = diaHojeStr;
+
+            const materiasHoje = cronograma[diaHojeStr] ? cronograma[diaHojeStr].split('\n') : [];
+            const container = document.getElementById('cardAlertasRevisao');
+            const lista = document.getElementById('listaRevisoesPendentes');
+            const contador = document.getElementById('totalRevisoesPendentes');
+            
+            if(materiasHoje.length === 0) {
+                container.classList.add('hidden');
+                contador.innerText = "0";
+                return;
+            }
+
+            // Filtra histórico: Matéria está no cronograma de HOJE + Não foi revisado + Estudado nos últimos 15 dias
+            const revisoesPendentes = historicoEstudos.filter(log => {
+                const dataEstudo = new Date(log.data);
+                const diffTime = Math.abs(hoje - dataEstudo);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                
+                // Encontrar o nome da matéria pelo ID
+                const itemDados = dados.find(d => d.id === log.idMateria);
+                if (!itemDados) return false;
+
+                // Lógica principal: 
+                // 1. Não revisado ainda
+                // 2. A matéria do log está no cronograma de hoje
+                // 3. O estudo não foi hoje (para não pedir revisão imediata)
+                const isMateriaDeHoje = materiasHoje.some(m => m === itemDados.materia);
+                const naoEhHoje = diffDays > 0; 
+
+                return !log.revisado && isMateriaDeHoje && naoEhHoje;
+            });
+
+            if (revisoesPendentes.length > 0) {
+                container.classList.remove('hidden');
+                container.classList.add('flex'); // Garante display
+                
+                lista.innerHTML = revisoesPendentes.map(log => {
+                    const item = dados.find(i => i.id === log.idMateria);
+                    const dataFormatada = new Date(log.data).toLocaleDateString('pt-BR');
+                    const linkQuestao = item.linkQuestao;
+                    
+                    // Botão de ir para questões (se tiver link)
+                    const btnQuestao = linkQuestao ? 
+                        `<a href="${linkQuestao}" target="_blank" class="text-blue-600 hover:underline text-xs mr-3"><i class="fas fa-external-link-alt"></i> Questões</a>` : '';
+
+                    return `
+                        <div class="bg-white p-3 rounded border border-yellow-200 flex justify-between items-center shadow-sm">
+                            <div>
+                                <p class="font-bold text-gray-800 text-sm">${item.materia}</p>
+                                <p class="text-xs text-gray-600">Assunto: <span class="font-semibold">${item.assunto}</span></p>
+                                <p class="text-xs text-gray-400 mt-1">Estudado em: ${dataFormatada}</p>
+                            </div>
+                            <div class="flex flex-col items-end">
+                                ${btnQuestao}
+                                <button onclick="marcarComoRevisado(${log.timestamp})" class="mt-2 bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1 rounded text-xs font-semibold transition">
+                                    <i class="fas fa-check"></i> Concluir
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                contador.innerText = revisoesPendentes.length;
+            } else {
+                container.classList.add('hidden');
+                contador.innerText = "0";
+            }
+        }
+
+        function marcarComoRevisado(timestampLog) {
+            const index = historicoEstudos.findIndex(log => log.timestamp === timestampLog);
+            if (index !== -1) {
+                historicoEstudos[index].revisado = true;
+                localStorage.setItem('historicoEstudosPCPR', JSON.stringify(historicoEstudos));
+                
+                // Animação visual simples
+                renderizar(); 
+                showToast("Revisão Concluída", "Tópico marcado como revisado!", "success");
+            }
+        }
+
+        // --- Funções Padrão ---
+
+        function salvarDados() {
+            localStorage.setItem('dadosPCPR', JSON.stringify(dados));
+            renderizar();
+        }
+
+        function salvarCronograma() {
+            localStorage.setItem('cronogramaPCPR', JSON.stringify(cronograma));
+            renderizarCronograma();
+            // Revalidar revisões ao mudar cronograma
+            verificarRevisoesDoDia();
+        }
+
+        function adicionarMateriaCronograma(dia, materia) {
+            if (!materia) return;
+            const current = cronograma[dia] ? cronograma[dia].split('\n') : [];
+            if (!current.includes(materia)) {
+                current.push(materia);
+                cronograma[dia] = current.filter(Boolean).join('\n');
+                salvarCronograma();
+            }
+        }
+
+        function removerMateriaCronograma(dia, materiaParaRemover) {
+            const current = cronograma[dia] ? cronograma[dia].split('\n') : [];
+            const novoArray = current.filter(m => m !== materiaParaRemover);
+            cronograma[dia] = novoArray.join('\n');
+            salvarCronograma();
+        }
+
+        function resetarCronograma() {
+            if(confirm("Deseja restaurar o cronograma padrão?")) {
+                cronograma = {...defaultCronograma};
+                salvarCronograma();
+            }
+        }
+
+        function renderizarCronograma() {
+            const grid = document.getElementById('gridCronograma');
+            grid.innerHTML = '';
+            
+            const dias = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+            
+            dias.forEach(dia => {
+                const listaMaterias = cronograma[dia] ? cronograma[dia].split('\n').filter(Boolean) : [];
+                
+                let bgClass = "bg-gray-50 border-gray-200";
+                if(dia === 'Sábado') bgClass = "bg-blue-50 border-blue-200";
+                if(dia === 'Domingo') bgClass = "bg-red-50 border-red-200";
+
+                const div = document.createElement('div');
+                div.className = `flex flex-col h-full border rounded p-2 ${bgClass}`;
+                
+                const header = document.createElement('div');
+                header.className = "font-bold text-gray-700 text-sm mb-2 text-center";
+                header.innerText = dia;
+                div.appendChild(header);
+
+                const chipsContainer = document.createElement('div');
+                chipsContainer.className = "flex-grow flex flex-col gap-1 mb-2";
+                
+                listaMaterias.forEach(materia => {
+                    const chip = document.createElement('div');
+                    chip.className = "bg-white border px-2 py-1 rounded text-xs flex justify-between items-center shadow-sm";
+                    chip.innerHTML = `
+                        <span class="truncate mr-1 text-gray-700 font-medium" title="${materia}">${materia}</span>
+                        <button onclick="removerMateriaCronograma('${dia}', '${materia}')" class="text-red-400 hover:text-red-600 font-bold focus:outline-none">×</button>
+                    `;
+                    chipsContainer.appendChild(chip);
+                });
+                div.appendChild(chipsContainer);
+
+                const select = document.createElement('select');
+                select.className = "w-full p-1 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white";
+                select.innerHTML = `<option value="">+ Adicionar</option>`;
+                
+                MATERIAS_DISPONIVEIS.forEach(mat => {
+                    select.innerHTML += `<option value="${mat}">${mat}</option>`;
+                });
+
+                select.onchange = (e) => {
+                    adicionarMateriaCronograma(dia, e.target.value);
+                    e.target.value = "";
+                };
+                div.appendChild(select);
+
+                grid.appendChild(div);
+            });
+        }
+
+        function atualizarRelevancia(id, novoValor) {
+            let valor = parseInt(novoValor);
+            if (isNaN(valor)) valor = 0; if (valor < 0) valor = 0; if (valor > 100) valor = 100;
+            const index = dados.findIndex(i => i.id === id);
+            if (index !== -1) { dados[index].relevancia = valor; salvarDados(); }
+        }
+
+        function confirmarDelecao(id) {
+            showModal("Excluir Conteúdo", "Tem certeza que deseja excluir este assunto?", "danger", () => {
+                dados = dados.filter(item => item.id !== id);
+                salvarDados();
+                const select = document.getElementById('selectMateriaEstudo');
+                if (select.value == id) { pausarTimer(); segundos = 0; document.getElementById('displayTempo').innerText = "00:00:00"; select.value = ""; select.disabled = false; isRunning = false; document.getElementById('btnStart').classList.remove('opacity-50', 'cursor-not-allowed'); }
+            });
+        }
+
+        function formatarTempo(segundos) {
+            const h = Math.floor(segundos / 3600);
+            const m = Math.floor((segundos % 3600) / 60);
+            const s = segundos % 60;
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function toggleGrupo(grupoId) {
+            const linhas = document.querySelectorAll(`.${grupoId}`);
+            linhas.forEach(linha => linha.classList.toggle('hidden'));
+            const icon = document.getElementById(`icon-${grupoId}`);
+            if(icon) {
+                if(icon.classList.contains('fa-chevron-down')) { icon.classList.remove('fa-chevron-down'); icon.classList.add('fa-chevron-right'); } 
+                else { icon.classList.remove('fa-chevron-right'); icon.classList.add('fa-chevron-down'); }
+            }
+        }
+
+        function abrirEditorLink(id) {
+            const item = dados.find(i => i.id === id);
+            if (!item) return;
+            const inputLink = document.getElementById('modalInputLink');
+            inputLink.value = item.linkQuestao || "";
+            document.getElementById('modalInputContainer').classList.remove('hidden');
+            showModal("Gerenciar Link de Questões", `Insira o link para o assunto: <b>${item.assunto}</b>`, "info", () => {
+                const novoLink = inputLink.value.trim();
+                const index = dados.findIndex(i => i.id === id);
+                if(index !== -1) { dados[index].linkQuestao = novoLink; salvarDados(); }
+            });
+        }
+
+        function encontrarJurisprudencia(materia, assunto) {
+            const mapMateria = { "Direito Constitucional": "CONSTITUCIONAL", "Direito Administrativo": "ADMINISTRATIVO", "Direito Penal": "PENAL", "Direito Processual Penal": "PROCESSUAL", "Legislação Penal Especial": "LEGISLACAO", "Estrutura do Executivo PR": "ESTATUTO" };
+            let categoria = mapMateria[materia];
+            if (!categoria) {
+                const termo = (materia + " " + assunto).toUpperCase();
+                if (termo.includes("CONSTITUCIONAL") || termo.includes("DIREITOS FUNDAMENTAIS")) categoria = "CONSTITUCIONAL";
+                else if (termo.includes("ADMINISTRATIVO") || termo.includes("ESTADO") || termo.includes("PODER")) categoria = "ADMINISTRATIVO";
+                else if (termo.includes("PROCESSUAL") || termo.includes("INQUÉRITO") || termo.includes("PRISÃO")) categoria = "PROCESSUAL";
+                else if (termo.includes("PENAL") && !termo.includes("ESPECIAL")) categoria = "PENAL";
+                else if (termo.includes("LEI") || termo.includes("ESTATUTO") || termo.includes("ESPECIAL")) categoria = "LEGISLACAO";
+            }
+            return categoria ? BANCO_JURISPRUDENCIA[categoria] : null;
+        }
+
+        function verJurisprudencia(categoria) {
+            const juris = BANCO_JURISPRUDENCIA[categoria];
+            if (!juris) return;
+            const modalJuris = document.getElementById('modalJurisContent');
+            document.getElementById('modalTitle').innerText = "Jurisprudência Relevante";
+            document.getElementById('modalTitle').className = "text-lg font-bold text-indigo-700";
+            document.getElementById('modalMessage').innerHTML = ""; 
+            document.getElementById('modalInputContainer').classList.add('hidden');
+            modalJuris.innerHTML = juris.map(decisao => `
+                <div class="bg-indigo-50 border-l-4 border-indigo-500 p-3 rounded shadow-sm">
+                    <div class="flex justify-between items-start mb-1"><span class="text-xs font-bold text-indigo-800 bg-indigo-200 px-2 py-0.5 rounded">${decisao.p}</span></div>
+                    <h4 class="text-sm font-bold text-gray-800 mb-1">${decisao.t}</h4><p class="text-xs text-gray-700 leading-relaxed">${decisao.r}</p>
+                </div>`).join('');
+            modalJuris.classList.remove('hidden');
+            document.getElementById('modalButtons').innerHTML = `<button onclick="closeModal()" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 font-medium transition shadow-sm">Fechar</button>`;
+            document.getElementById('customModal').classList.remove('hidden');
+        }
+
+        function renderizar() {
+            renderizarCronograma();
+            verificarRevisoesDoDia(); // Chama verificação ao renderizar
+            const tbody = document.getElementById('tabelaCorpo');
+            const select = document.getElementById('selectMateriaEstudo');
+            const emptyState = document.getElementById('emptyState');
+            tbody.innerHTML = '';
+            
+            if (dados.length === 0) { emptyState.classList.remove('hidden'); } 
+            else { emptyState.classList.add('hidden'); }
+            
+            const valorAtualSelect = select.value;
+            if (!isRunning) { select.innerHTML = '<option value="">Selecione o que vai estudar...</option>'; }
+
+            let totalSegundosGeral = 0;
+            const grupos = {};
+            dados.forEach(item => {
+                if (!grupos[item.materia]) { grupos[item.materia] = { itens: [], tempoTotalMateria: 0 }; }
+                grupos[item.materia].itens.push(item);
+                grupos[item.materia].tempoTotalMateria += item.tempo;
+                totalSegundosGeral += item.tempo;
+            });
+
+            const materiasOrdenadas = Object.keys(grupos).sort();
+            materiasOrdenadas.forEach((materia, idx) => {
+                const grupo = grupos[materia];
+                const grupoId = `grupo-${idx}`;
+                const trHeader = document.createElement('tr');
+                trHeader.className = "bg-gray-100 border-b border-gray-200 cursor-pointer hover:bg-gray-200 transition";
+                trHeader.onclick = () => toggleGrupo(grupoId);
+                trHeader.innerHTML = `
+                    <td colspan="4" class="px-5 py-3">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-gray-800 text-lg flex items-center select-none"><i id="icon-${grupoId}" class="fas fa-chevron-down text-gray-500 mr-3 w-4"></i><i class="fas fa-folder-open text-blue-500 mr-2"></i> ${materia}</span>
+                            <span class="text-xs font-semibold text-gray-500 bg-gray-200 px-2 py-1 rounded">Total: ${formatarTempo(grupo.tempoTotalMateria)}</span>
+                        </div>
+                    </td>`;
+                tbody.appendChild(trHeader);
+
+                grupo.itens.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.className = `${grupoId} hover:bg-gray-50 transition border-b border-gray-100 animate-fadeIn`;
+                    let corBarra = item.relevancia > 75 ? 'bg-red-500' : (item.relevancia > 40 ? 'bg-yellow-500' : (item.relevancia == 0 ? 'bg-gray-300' : 'bg-green-500'));
+                    
+                    const categoriaJuris = encontrarJurisprudencia(item.materia, item.assunto) ? Object.keys(BANCO_JURISPRUDENCIA).find(key => BANCO_JURISPRUDENCIA[key] === encontrarJurisprudencia(item.materia, item.assunto)) : null;
+                    const jurisButton = categoriaJuris ? `<button onclick="verJurisprudencia('${categoriaJuris}')" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center transition hover:underline" title="Ver Jurisprudência"><i class="fas fa-gavel mr-1"></i> Juris</button>` : '';
+                    const questaoButton = item.linkQuestao ? `<a href="${item.linkQuestao}" target="_blank" class="text-xs text-orange-600 hover:text-orange-800 font-semibold flex items-center transition hover:underline" title="Ir para Questões"><i class="fas fa-pencil-alt mr-1"></i> Questões</a>` : '';
+
+                    tr.innerHTML = `
+                        <td class="px-5 py-4 text-sm text-gray-600 pl-10 border-l-4 border-transparent hover:border-blue-300">
+                            <div class="flex justify-between items-center"><span class="font-medium text-gray-700">${item.assunto}</span><div class="flex gap-2 ml-4"><button onclick="abrirEditorLink(${item.id})" class="text-gray-400 hover:text-blue-500 transition" title="Adicionar/Editar Link"><i class="fas fa-link"></i></button></div></div>
+                            <div class="flex gap-3 mt-1">${jurisButton}${questaoButton}</div>
+                        </td>
+                        <td class="px-5 py-4 text-sm"><div class="flex items-center gap-2"><input type="number" min="0" max="100" value="${item.relevancia}" onchange="atualizarRelevancia(${item.id}, this.value)" class="text-xs font-bold w-12 text-center border border-gray-300 rounded p-1 focus:border-blue-500"><div class="w-full bg-gray-200 rounded-full h-2"><div class="${corBarra} h-2 rounded-full transition-all duration-300" style="width: ${item.relevancia}%"></div></div></div></td>
+                        <td class="px-5 py-4 text-sm font-mono text-gray-600"><span class="bg-gray-100 px-2 py-1 rounded border border-gray-200">${formatarTempo(item.tempo)}</span></td>
+                        <td class="px-5 py-4 text-sm text-center"><button onclick="confirmarDelecao(${item.id})" class="text-red-500 hover:text-red-700 hover:bg-red-100 p-2 rounded-full transition" title="Excluir"><i class="fas fa-trash"></i></button></td>`;
+                    tbody.appendChild(tr);
+                    if (!isRunning) { const option = document.createElement('option'); option.value = item.id; option.text = `${item.materia} > ${item.assunto}`; select.appendChild(option); }
+                });
+            });
+            if (!isRunning && valorAtualSelect) { if ([...select.options].some(o => o.value == valorAtualSelect)) { select.value = valorAtualSelect; } }
+            
+            // ATENÇÃO: Assegurando que os elementos existem antes de tentar modificar suas propriedades innerText.
+            const totalAssuntosEl = document.getElementById('totalAssuntos');
+            if (totalAssuntosEl) totalAssuntosEl.innerText = dados.length;
+
+            const horasGeral = Math.floor(totalSegundosGeral / 3600);
+            const minGeral = Math.floor((totalSegundosGeral % 3600) / 60);
+            
+            const totalHorasEl = document.getElementById('totalHoras');
+            if(totalHorasEl) totalHorasEl.innerText = `${horasGeral}h ${minGeral}m`;
+        }
+
+        // --- Funções Auxiliares de Modal/Toast/Timer (sem alterações lógicas, apenas compactadas para caber) ---
+        function showModal(title, message, type = "info", onConfirm = null) {
+            const modal = document.getElementById('customModal');
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalMessage').innerHTML = message;
+            
+            // Limpa conteudos extras se nao for especifico
+            if(type !== 'info') { 
+                document.getElementById('modalJurisContent').classList.add('hidden');
+                document.getElementById('modalInputContainer').classList.add('hidden');
+            }
+
+            const modalButtons = document.getElementById('modalButtons');
+            modalButtons.innerHTML = '';
+            
+            const existingIcon = document.getElementById('modalHeader').querySelector('i');
+            if(existingIcon) existingIcon.remove();
+            let iconHtml = type === 'danger' ? '<i class="fas fa-exclamation-triangle text-red-500 text-xl"></i>' : (type === 'success' ? '<i class="fas fa-check-circle text-green-500 text-xl"></i>' : '<i class="fas fa-info-circle text-blue-500 text-xl"></i>');
+            document.getElementById('modalHeader').insertAdjacentHTML('afterbegin', iconHtml);
+
+            if (onConfirm) {
+                modalButtons.innerHTML = `<button onclick="closeModal()" class="px-4 py-2 bg-white text-gray-700 border rounded mr-2">Cancelar</button><button id="btnConfirm" class="px-4 py-2 bg-blue-600 text-white rounded">Confirmar</button>`;
+                document.getElementById('btnConfirm').onclick = () => { onConfirm(); closeModal(); };
+            } else {
+                modalButtons.innerHTML = `<button onclick="closeModal()" class="px-4 py-2 bg-blue-600 text-white rounded">OK</button>`;
+            }
+            modal.classList.remove('hidden');
+        }
+        function closeModal() { document.getElementById('customModal').classList.add('hidden'); document.getElementById('modalInputContainer').classList.add('hidden'); document.getElementById('modalJurisContent').classList.add('hidden'); }
+        function showToast(title, msg, type) { console.log(title, msg); }
+        document.getElementById('customModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+
+        function iniciarTimer() {
+            const select = document.getElementById('selectMateriaEstudo');
+            if(!select.value) { showModal("Atenção", "Selecione uma matéria!", "warning"); return; }
+            if(isRunning) return;
+            isRunning = true;
+            document.getElementById('selectMateriaEstudo').disabled = true;
+            document.getElementById('btnStart').classList.add('opacity-50');
+            timerInterval = setInterval(() => { segundos++; document.getElementById('displayTempo').innerText = formatarTempo(segundos); }, 1000);
+        }
+        function pausarTimer() { if(!isRunning) return; clearInterval(timerInterval); isRunning = false; document.getElementById('btnStart').classList.remove('opacity-50'); }
+        function pararESalvar() {
+            if(!document.getElementById('selectMateriaEstudo').value) return;
+            if(isRunning) pausarTimer();
+            if(segundos === 0) return;
+            const idSelecionado = parseInt(document.getElementById('selectMateriaEstudo').value);
+            const index = dados.findIndex(i => i.id === idSelecionado);
+            if(index !== -1) {
+                dados[index].tempo += segundos;
+                // --- REGISTRO DE HISTÓRICO PARA REVISÃO ---
+                historicoEstudos.push({
+                    idMateria: idSelecionado,
+                    data: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+                    timestamp: Date.now(),
+                    tempo: segundos,
+                    revisado: false
+                });
+                localStorage.setItem('historicoEstudosPCPR', JSON.stringify(historicoEstudos));
+                // ------------------------------------------
+                salvarDados();
+                showModal("Sucesso", "Tempo salvo e agendado para revisão futura.", "success");
+            }
+            segundos = 0;
+            document.getElementById('displayTempo').innerText = "00:00:00";
+            document.getElementById('selectMateriaEstudo').disabled = false;
+            document.getElementById('selectMateriaEstudo').value = "";
+        }
+
+        renderizar();
+    </script>
+</body>
+</html>
